@@ -1,0 +1,86 @@
+
+install.packages("multilinguer")
+library(multilinguer)
+
+install_jdk()
+
+install.packages(c('stringr', 'hash', 'tau', 'Sejong', 'RSQLite', 'devtools'), type = "binary")
+install.packages("remotes")
+remotes::install_github('haven-jeon/KoNLP', upgrade = "never", INSTALL_opts=c("--no-multiarch"))
+
+install.packages(c('stringr','stringi','tm','sna','xml2','dplyr','qgraph'))
+
+library(KoNLP)
+library(stringr); library(stringi);library(tm); library(sna);library(xml2);library(qgraph); library(dplyr)
+useSejongDic() #useNIADic()
+ 
+
+f <- file("woo-1.txt", encoding="euc-kr") 
+fl <- readLines(f) #ÀÌ·± ½ÄÀ¸·Î´Â ¹ÚÂù¿± ´ÔÀÇ ºí·Î±×¿¡¼­ ºÃ´Âµ¥, ÁÁÀº °Í °°½À´Ï´Ù.
+close(f)
+
+#ºÒ¿ë¾î Ã³¸®
+{
+  fl <- gsub("±×¸®°í","",fl); fl <- gsub("³Ê¹«","",fl); fl <- gsub("Á¤¸»","",fl);
+  fl <- gsub("ÁøÂ¥","",fl); fl <- gsub("±×¶§","",fl); fl <- gsub("ÀÖ´Â","",fl); fl <- gsub("À»","",fl);fl <- gsub("¸¦","",fl);
+  fl <- gsub("¾Æ´Â","",fl);fl <- gsub("ÇÏ´Â","",fl);fl <- gsub("Æ¯È÷","",fl);fl <- gsub("¿ª½Ã","",fl);
+  fl <- gsub("","",fl);fl <- gsub("º°Á¡","",fl);fl <- gsub("-","",fl);fl <- gsub("ÃÑ","",fl);
+  fl <- gsub("Á¡","",fl);fl <- gsub("Áß","",fl);fl <- gsub("1","",fl);fl <- gsub("2","",fl);fl <- gsub("3","",fl);
+  fl <- gsub("3","",fl);fl <- gsub("4","",fl);fl <- gsub("5","",fl);fl <- gsub("6","",fl);fl <- gsub("7","",fl);
+  fl <- gsub("8","",fl);fl <- gsub("9","",fl);fl <- gsub("10","",fl);fl <- gsub("½Å°í","",fl);
+  }
+#ºñ½ÁÇÑ ´Ü¾î Ã³¸®
+fl <- str_replace_all(fl, "[[:punct:]]", "") %>%  
+  str_replace_all("¾çÁ¶À§[°¡|´Â]", "¾çÁ¶À§") %>%
+  str_replace_all("¿ø´õ", "¿ø´õ¿ì¸Õ") %>%
+  str_replace_all("[0-9]+", " ") %>%
+  str_replace_all("»ç¶û[Àº|°¡]", "»ç¶û") %>%
+  str_replace_all("»ö,°è[´Â|°¡]", "»ö°è")
+
+write.table(fl,"preprocessing.txt")
+
+f_1 <- file("preprocessing.txt", encoding="euc-kr")
+fl_1 <- readLines(f_1) #ÀÌ·± ½ÄÀ¸·Î´Â ¹ÚÂù¿± ´ÔÀÇ ºí·Î±×¿¡¼­ ºÃ´Âµ¥, ÁÁÀº °Í °°½À´Ï´Ù.
+close(f_1) #À§ ÄÚµåÃ³·³ ÄÚµùÇÏ¸é, ÀÌ ÄÚµå°¡ ÇÊ¿äÇØ¿ä.
+
+fl_1
+
+ko.words = function(doc){
+  doc = as.character(doc) #µ¥ÀÌÅÍ¸¦ ¹®ÀÚ¿­ Å¸ÀÔÀ¸·Î º¯È¯
+  doc2<-SimplePos22(doc) #´Ü¾î Ç°»ç¸¦ 22°¡Áö·Î ±¸ºÐÇÑ SimplePos22ÇÔ¼ö Àû¿ë
+  doc3<-str_match(doc2,"[°¡-ÆR]+/NC" ) #±× Áß NC(º¸Åë¸í»ç)¸¸ ÃßÃâÇÏ´Â Á¤±Ô½Ä, [°¡-ÆR]ÀÌ ¸»Àº °¡-ÆR±îÁöÀÇ ´Ü¾î¸¦ ´Ù º¸°í ±× Áß NC¸¸ ÃßÃâÇØ¶ó´Â ÀÇ¹Ì ÀÔ´Ï´Ù.
+  doc4<-doc3[,2] #ÃßÃâÇÑ °á°ú Áß ´Ü¾î¸¸ ÀÖ´Â 2¿­ ÃßÃâ
+  doc4[!is.na(doc4)] #ÃßÃâÇÑ °á°ú Áß ³Î(NA)°ª »èÁ¦
+}
+
+options(mc.cores = 1) #¸ÖÆ¼ÄÚ¾î »ç¿ë ¾ÈÇÔ(ÀÇ¹Ì¸¦ Á¤È®È÷´Â ¾ÆÁ÷ ¸ð¸£°Ú¾î¿ä.)
+
+cps = Corpus(VectorSource(fl_1)) 
+
+install.packages(c('stringr','stringi','tm','sna','xml2','dplyr','qgraph'))
+library(stringr); library(stringi);library(tm); library(sna);library(xml2);library(qgraph); library(dplyr)
+
+tdm <- TermDocumentMatrix(cps, control = list(tokenize = ko.words, 
+                                              removePunctuation=T,removeNumbers=T, 
+                                              wordLengths=c(4,Inf))) 
+
+result <- as.matrix(tdm) #tdmÀ» matrix Å¸ÀÔÀ¸·Î º¯È¯, ÇÁ·Î±×·¡¹Ö¿¡¼­ µ¥ÀÌÅÍ Å¸ÀÔÀÌ Áß¿äÇÑµ¥ Å¸ÀÔÀÌ ¾È¸ÂÀ¸¸é ÇÔ¼ö°¡ Àû¿ëµÇÁö ¾Ê¾Æ¿ä.
+
+word.count = rowSums(result)
+word.order = order(word.count, decreasing = T)
+freq.word = result[word.order[1:15],]
+freq.word[,1]
+
+freqency <- data.frame(freq.word)
+write.csv(freqency,"woo-1.csv")
+
+co.matrix = freq.word %*% t(freq.word) #°øÃâÇö Çà·Ä º¯È¯(±×·¡ÇÁ¸¦ ±×¸®±â À§ÇØ ²À ÇÊ¿äÇØ¿ä)
+co.matrix
+
+qg<-qgraph(co.matrix,labels=rownames(co.matrix), #±×·¡ÇÁ ³ëµåÀÇ ¶óº§Àº ´Ü¾îÀÇ ÀÌ¸§À¸·Î
+           diag=F, layout='spring', #±×·¡ÇÁ ½ºÅ¸ÀÏÀº spring Å¸ÀÔÀ¸·Î
+           label.cex= 4.0, #¶óº§ÀÇ ±Û¾¾ Å©±â
+           edge.color='blue', #¶óº§À» ÀÌ¾îÁÖ´Â ¼±ÀÇ »ö±òÀº ÆÄ¶û
+           vsize=log(diag(co.matrix))*1.5) #³ëµåÀÇ »çÀÌÁî´Â Áß¿äµµ¿¡ µû¶ó Å©±â¸¦ Á¶Àý
+
+plot(qg) #±×·¡ÇÁ ±×¸®±â!
